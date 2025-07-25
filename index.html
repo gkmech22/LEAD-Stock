@@ -5,27 +5,33 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Order Management System</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        .menu { margin-bottom: 20px; }
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f9f9f9; }
+        h1 { color: #333; text-align: center; }
+        .menu { margin-bottom: 20px; text-align: center; }
+        .menu button { padding: 10px 20px; margin: 5px; cursor: pointer; background-color: #4CAF50; color: white; border: none; border-radius: 5px; }
+        .menu button:hover { background-color: #45a049; }
         .form-group { margin: 10px 0; }
-        label { display: inline-block; width: 120px; }
-        button { margin-right: 10px; }
-        #result { margin-top: 20px; }
-        table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+        label { display: inline-block; width: 120px; font-weight: bold; }
+        input, select { padding: 5px; width: 200px; }
+        button.submit { background-color: #008CBA; }
+        button.submit:hover { background-color: #007B9A; }
+        #result { margin-top: 20px; padding: 10px; background-color: white; border: 1px solid #ddd; border-radius: 5px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
         th { background-color: #f2f2f2; }
+        .hidden { display: none; }
     </style>
     <!-- Supabase Client -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
-        // Initialize Supabase client
+        // Initialize Supabase client (replace with your credentials)
         const supabaseUrl = 'https://your-supabase-project-url.supabase.co';
         const supabaseKey = 'your-supabase-anon-key';
         const supabase = supabase.createClient(supabaseUrl, supabaseKey);
 
         let orderCounter = 1;
 
-        // Order and Device models (simplified as JS objects)
+        // Order and Device models
         class Order {
             constructor(orderType, salesOrder, dealId, nucleusId, schoolName, product, model, quantity, sdCardSize, profileId, location, warehouse) {
                 this.id = `ORD-${String(orderCounter++).padStart(6, '0')}`;
@@ -83,28 +89,33 @@
             }
         }
 
+        // Function to display messages or tables
+        function displayResult(content) {
+            document.getElementById('result').innerHTML = content;
+        }
+
         // Menu functions
         async function createNewOrder() {
-            const form = document.createElement('form');
-            form.innerHTML = `
-                <div class="form-group"><label>Order Type:</label><input type="text" id="orderType" required></div>
-                <div class="form-group"><label>Sales Order:</label><input type="text" id="salesOrder" required></div>
-                <div class="form-group"><label>Deal ID:</label><input type="text" id="dealId"></div>
-                <div class="form-group"><label>Nucleus ID:</label><input type="text" id="nucleusId"></div>
-                <div class="form-group"><label>School Name:</label><input type="text" id="schoolName"></div>
-                <div class="form-group"><label>Product:</label><input type="text" id="product"></div>
-                <div class="form-group"><label>Model:</label><input type="text" id="model"></div>
-                <div class="form-group"><label>Quantity:</label><input type="number" id="quantity" required></div>
-                <div class="form-group"><label>SD Card Size:</label><input type="text" id="sdCardSize"></div>
-                <div class="form-group"><label>Profile ID:</label><input type="text" id="profileId"></div>
-                <div class="form-group"><label>Location:</label><input type="text" id="location"></div>
-                <div class="form-group"><label>Warehouse:</label><input type="text" id="warehouse" required></div>
-                <button type="submit">Submit</button>
+            const form = `
+                <form id="orderForm">
+                    <div class="form-group"><label>Order Type:</label><input type="text" id="orderType" required></div>
+                    <div class="form-group"><label>Sales Order:</label><input type="text" id="salesOrder" required></div>
+                    <div class="form-group"><label>Deal ID:</label><input type="text" id="dealId"></div>
+                    <div class="form-group"><label>Nucleus ID:</label><input type="text" id="nucleusId"></div>
+                    <div class="form-group"><label>School Name:</label><input type="text" id="schoolName"></div>
+                    <div class="form-group"><label>Product:</label><input type="text" id="product"></div>
+                    <div class="form-group"><label>Model:</label><input type="text" id="model"></div>
+                    <div class="form-group"><label>Quantity:</label><input type="number" id="quantity" required></div>
+                    <div class="form-group"><label>SD Card Size:</label><input type="text" id="sdCardSize"></div>
+                    <div class="form-group"><label>Profile ID:</label><input type="text" id="profileId"></div>
+                    <div class="form-group"><label>Location:</label><input type="text" id="location"></div>
+                    <div class="form-group"><label>Warehouse:</label><input type="text" id="warehouse" required></div>
+                    <button type="submit" class="submit">Submit</button>
+                </form>
             `;
-            document.getElementById('result').innerHTML = '';
-            document.getElementById('result').appendChild(form);
+            displayResult(form);
 
-            form.addEventListener('submit', async (e) => {
+            document.getElementById('orderForm').addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const order = new Order(
                     document.getElementById('orderType').value,
@@ -121,18 +132,16 @@
                     document.getElementById('warehouse').value
                 );
 
-                const { data, error } = await supabase.from('orders').insert([order]);
+                const { data, error } = await supabase.from('orders').insert([order]).select();
                 if (error) {
-                    document.getElementById('result').innerText = `Error: ${error.message}`;
+                    displayResult(`Error: ${error.message}`);
                     return;
                 }
 
-                order.deviceNumbers.forEach(deviceNumber => {
-                    supabase.from('devices').insert([new Device(deviceNumber, order)]);
-                });
+                const devices = order.deviceNumbers.map(dn => new Device(dn, order));
+                await supabase.from('devices').insert(devices);
 
-                document.getElementById('result').innerText = `Order Created: ${JSON.stringify(order)}`;
-                form.remove();
+                displayResult(`Order Created: <pre>${JSON.stringify(data[0], null, 2)}</pre>`);
             });
         }
 
@@ -142,7 +151,7 @@
 
             const { data, error } = await supabase.from('orders').select('*').ilike('salesOrder', `%${searchTerm}%`);
             if (error) {
-                document.getElementById('result').innerText = `Error: ${error.message}`;
+                displayResult(`Error: ${error.message}`);
                 return;
             }
             displayOrders(data);
@@ -151,7 +160,7 @@
         async function viewAllDevices() {
             const { data, error } = await supabase.from('devices').select('*').order('createdAt', { ascending: false });
             if (error) {
-                document.getElementById('result').innerText = `Error: ${error.message}`;
+                displayResult(`Error: ${error.message}`);
                 return;
             }
             displayDevices(data);
@@ -163,7 +172,7 @@
 
             const { data, error } = await supabase.from('devices').select('*').ilike('deviceNumber', `%${searchTerm}%`);
             if (error) {
-                document.getElementById('result').innerText = `Error: ${error.message}`;
+                displayResult(`Error: ${error.message}`);
                 return;
             }
             displayDevices(data);
@@ -172,7 +181,7 @@
         function exportCSV() {
             supabase.from('devices').select('*').then(({ data, error }) => {
                 if (error) {
-                    document.getElementById('result').innerText = `Error: ${error.message}`;
+                    displayResult(`Error: ${error.message}`);
                     return;
                 }
                 const csv = [
@@ -186,32 +195,76 @@
                 a.download = `devices_export_${new Date().toISOString().replace(/[:.-]/g, '')}.csv`;
                 a.click();
                 window.URL.revokeObjectURL(url);
-                document.getElementById('result').innerText = 'CSV exported successfully';
+                displayResult('CSV exported successfully');
             });
+        }
+
+        async function viewWarehouseSummary() {
+            const { data: orders, error } = await supabase.from('orders').select('*');
+            if (error) {
+                displayResult(`Error: ${error.message}`);
+                return;
+            }
+            const summary = {};
+            orders.forEach(order => {
+                summary[order.warehouse] = (summary[order.warehouse] || 0) + order.quantity;
+            });
+            displayResult('<h3>Warehouse Summary</h3>' + Object.entries(summary).map(([warehouse, total]) => `<p>${warehouse}: ${total} units</p>`).join(''));
+        }
+
+        async function viewOrdersByWarehouse() {
+            const { data: warehouses, error } = await supabase.from('orders').select('warehouse').distinct();
+            if (error) {
+                displayResult(`Error: ${error.message}`);
+                return;
+            }
+            const warehouseList = warehouses.map(w => w.warehouse).filter(w => w);
+            const choice = prompt(`Select warehouse:\n${warehouseList.map((w, i) => `${i + 1}. ${w}`).join('\n')}`);
+            if (!choice) return;
+            const index = parseInt(choice) - 1;
+            if (index >= 0 && index < warehouseList.length) {
+                const warehouse = warehouseList[index];
+                const { data, error: orderError } = await supabase.from('orders').select('*').eq('warehouse', warehouse);
+                if (orderError) {
+                    displayResult(`Error: ${orderError.message}`);
+                    return;
+                }
+                displayOrders(data);
+            } else {
+                displayResult('Invalid selection');
+            }
         }
 
         // Display functions
         function displayOrders(orders) {
-            const table = document.createElement('table');
-            table.innerHTML = `
-                <tr><th>ID</th><th>Type</th><th>Sales Order</th><th>Quantity</th><th>Warehouse</th></tr>
-                ${orders.map(o => `<tr><td>${o.id}</td><td>${o.orderType}</td><td>${o.salesOrder}</td><td>${o.quantity}</td><td>${o.warehouse}</td></tr>`).join('')}
+            if (!orders.length) {
+                displayResult('No orders found.');
+                return;
+            }
+            const table = `
+                <table>
+                    <tr><th>ID</th><th>Type</th><th>Sales Order</th><th>Quantity</th><th>Warehouse</th></tr>
+                    ${orders.map(o => `<tr><td>${o.id}</td><td>${o.orderType}</td><td>${o.salesOrder}</td><td>${o.quantity}</td><td>${o.warehouse}</td></tr>`).join('')}
+                </table>
             `;
-            document.getElementById('result').innerHTML = '';
-            document.getElementById('result').appendChild(table);
+            displayResult(table);
         }
 
         function displayDevices(devices) {
-            const table = document.createElement('table');
-            table.innerHTML = `
-                <tr><th>Created At</th><th>Order Type</th><th>Order ID</th><th>Sales Order</th><th>Device Number</th><th>Quantity</th><th>Product</th><th>Warehouse</th></tr>
-                ${devices.map(d => `<tr><td>${d.createdAt}</td><td>${d.orderType}</td><td>${d.orderId}</td><td>${d.salesOrder}</td><td>${d.deviceNumber}</td><td>${d.quantity}</td><td>${d.product}</td><td>${d.warehouse}</td></tr>`).join('')}
+            if (!devices.length) {
+                displayResult('No devices found.');
+                return;
+            }
+            const table = `
+                <table>
+                    <tr><th>Created At</th><th>Order Type</th><th>Order ID</th><th>Sales Order</th><th>Device Number</th><th>Quantity</th><th>Product</th><th>Warehouse</th></tr>
+                    ${devices.map(d => `<tr><td>${d.createdAt}</td><td>${d.orderType}</td><td>${d.orderId}</td><td>${d.salesOrder}</td><td>${d.deviceNumber}</td><td>${d.quantity}</td><td>${d.product}</td><td>${d.warehouse}</td></tr>`).join('')}
+                </table>
             `;
-            document.getElementById('result').innerHTML = '';
-            document.getElementById('result').appendChild(table);
+            displayResult(table);
         }
 
-        // Menu initialization
+        // Initialize menu
         document.addEventListener('DOMContentLoaded', () => {
             const menu = document.createElement('div');
             menu.className = 'menu';
@@ -221,9 +274,9 @@
                 <button onclick="viewAllDevices()">3. View All Devices</button>
                 <button onclick="searchDevices()">4. Search Devices</button>
                 <button onclick="exportCSV()">5. Export CSV</button>
-                <button onclick="alert('Feature not implemented')">6. View Warehouse Summary</button>
-                <button onclick="alert('Feature not implemented')">7. View Orders by Warehouse</button>
-                <button onclick="window.close()">8. Exit</button>
+                <button onclick="viewWarehouseSummary()">6. View Warehouse Summary</button>
+                <button onclick="viewOrdersByWarehouse()">7. View Orders by Warehouse</button>
+                <button onclick="if(confirm('Are you sure?')) window.close()">8. Exit</button>
             `;
             document.body.insertBefore(menu, document.getElementById('result'));
         });
